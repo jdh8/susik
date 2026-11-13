@@ -1,0 +1,30 @@
+[package]
+name = "susik"
+version = "0.1.0"
+authors = ["Chen-Pang He (https://jdh8.org)"]
+edition = "2024"
+rust-version = "1.93"
+description = "Four Color Cards (四色牌): the 112-card deck, multiset hands, melds, and a layout solver shared by its games"
+repository = "https://github.com/jdh8/susik"
+homepage = "https://github.com/jdh8/susik"
+documentation = "https://docs.rs/susik"
+readme = "README.md"
+license = "Apache-2.0"
+categories = ["game-development", "games"]
+keywords = ["four-color-cards", "si-se-pai", "tu-sac", "card-game", "cards"]
+exclude = [".claude/", "CLAUDE.md"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+# Shuffling: `shuffle` deals a random permutation of the deck.  Off by default
+# so the core crate stays dependency-free.
+rand = ["dep:rand"]
+
+[dependencies]
+rand = { version = "0.10", optional = true }
+thiserror = "2"
+
+[profile.dev.package."*"]
+opt-level = 2
