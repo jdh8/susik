@@ -9,7 +9,9 @@ pub mod meld;
 #[cfg(feature = "rand")]
 pub use deck::shuffle;
 pub use hand::{Card, Hand, ParseCardError, ParseHandError};
-pub use meld::{ColorSet, Layout, Meld, Solver, Values, completions, partition};
+pub use meld::{
+    ColorSet, Layout, Meld, Solver, Values, completions, locked_completions, partition,
+};
 
 use core::fmt;
 use thiserror::Error;

@@ -236,6 +236,23 @@ pub fn completions(hand: Hand, card: Card) -> Vec<Meld> {
     melds
 }
 
+/// The [`completions`] that keep sets whole
+///
+/// A set is three or four identical cards in `hand`.  In nearly every game
+/// of the deck it is locked: a meld takes all of it or none of it, so
+/// 車車車馬 does not take a 包 and 車車車 takes a fourth 車 only as a quad.
+#[must_use]
+pub fn locked_completions(hand: Hand, card: Card) -> Vec<Meld> {
+    let mut melds = completions(hand, card);
+    melds.retain(|meld| {
+        meld.cards()
+            .without(card)
+            .distinct()
+            .all(|(held, taken)| hand.count(held) < 3 || hand.count(held) == taken)
+    });
+    melds
+}
+
 /// A hand laid out as melds
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Layout {
@@ -260,10 +277,18 @@ enum Step {
 /// Without it, only exact partitions count and a hand that cannot be fully
 /// laid out has no layout.  The memo persists across calls and is only
 /// valid for the table and cost the solver was built with.
+///
+/// A [`locked`](Self::locked) solver keeps sets whole: three or four
+/// identical cards in the hand form their triplet or quad and nothing else,
+/// so 車車車馬包 is a triplet with 馬包 loose, never 車車 and 車馬包.  The
+/// hand must be the cards actually held; a card being claimed is first
+/// melded through [`locked_completions`], which judges the sets before it
+/// joins them.
 #[derive(Debug, Clone)]
 pub struct Solver {
     values: Values,
     loose: Option<u32>,
+    locked: bool,
     memo: HashMap<Hand, Option<(i32, Step)>>,
 }
 
@@ -274,8 +299,17 @@ impl Solver {
         Self {
             values,
             loose,
+            locked: false,
             memo: HashMap::new(),
         }
+    }
+
+    /// The same solver keeping every three or four identical cards whole
+    #[must_use]
+    pub fn locked(mut self) -> Self {
+        self.locked = true;
+        self.memo.clear();
+        self
     }
 
     /// The scoring table
@@ -329,18 +363,29 @@ impl Solver {
         // The lowest card belongs to some meld or is loose; try each and
         // recurse on the remainder.
         let rest = hand.without(card);
+        let set = match hand.count(card) {
+            3 if self.locked => Some(Meld::Triplet(card)),
+            4 if self.locked => Some(Meld::Quad(card)),
+            _ => None,
+        };
+        let melds = match set {
+            Some(meld) => vec![meld],
+            None if self.locked => locked_completions(rest, card),
+            None => completions(rest, card),
+        };
         let mut best: Option<(i32, Step)> = None;
         let mut offer = |score, step| {
             if best.is_none_or(|(b, _)| score > b) {
                 best = Some((score, step));
             }
         };
-        if let Some(cost) = self.loose
+        if set.is_none()
+            && let Some(cost) = self.loose
             && let Some(score) = self.solve(rest)
         {
             offer(score - cost as i32, Step::Loose(card));
         }
-        for meld in completions(rest, card) {
+        for meld in melds {
             if let Some(score) = self.solve(rest - meld.cards().without(card)) {
                 offer(score + self.values.score(&meld) as i32, Step::Meld(meld));
             }
@@ -452,5 +497,33 @@ mod tests {
         // The memo survives: a second query is consistent.
         assert_eq!(solver.best(hand("帥仕.俥..")), Some(-1));
         assert_eq!(solver.best(hand("仕仕...")), Some(0));
+    }
+
+    #[test]
+    fn locked_sets_stay_whole() {
+        // 大肚: the triplet stands and 傌炮 wait for nothing.
+        let belly = hand(".俥俥俥傌炮..");
+        assert_eq!(partition(belly, VALUES).unwrap().score, 1);
+        assert_eq!(Solver::new(VALUES, None).locked().best(belly), None);
+        let layout = Solver::new(VALUES, Some(1)).locked().layout(belly).unwrap();
+        assert_eq!(layout.score, 1);
+        assert_eq!(layout.melds, [Meld::Triplet(card("黃俥"))]);
+        assert_eq!(layout.loose, hand(".傌炮.."));
+        // Generals too, and four alike are a quad, not a triplet and a court.
+        let mut solver = Solver::new(VALUES, None).locked();
+        assert_eq!(solver.best(hand("帥帥帥仕相...")), None);
+        assert_eq!(solver.best(hand("帥帥帥帥仕相...")), None);
+        assert_eq!(solver.best(hand("帥帥帥帥仕仕...")), Some(8));
+        // Pairs are free.
+        assert_eq!(solver.best(hand("帥帥仕相...")), Some(3));
+
+        let field = Meld::Field(Color::Yellow);
+        let chariot = card("黃俥");
+        assert_eq!(locked_completions(hand(".俥俥俥傌.."), card("黃炮")), []);
+        assert_eq!(locked_completions(hand(".俥俥傌.."), card("黃炮")), [field]);
+        assert_eq!(
+            locked_completions(hand(".俥俥俥傌炮.."), chariot),
+            [Meld::Quad(chariot), field]
+        );
     }
 }

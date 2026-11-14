@@ -28,7 +28,9 @@ soldiers.
 - [`hand`][mod-hand]: [`Card`] and the multiset [`Hand`], 28 four-bit
   counts in a `u128`
 - [`meld`][mod-meld]: [`Meld`] shapes, [`Values`] tables, [`completions`]
-  (what a card completes), and the memoized [`Solver`] behind [`partition`]
+  (what a card completes), and the memoized [`Solver`] behind [`partition`];
+  `Solver::locked` and `locked_completions` keep three or four identical
+  cards whole, for the games that forbid splitting them
 - [`deck`][mod-deck] (feature `rand`): [`shuffle`]
 
 ## Feature flags

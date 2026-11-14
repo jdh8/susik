@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Solver::locked` and `locked_completions`: keep three or four identical
+  cards in a hand whole, as nearly every game of the deck requires, so
+  車車車馬包 is a triplet with 馬包 loose rather than 車車 and 車馬包.
+
 ## [0.1.0] - 2026-11-14
 
 ### Added
